@@ -8,6 +8,10 @@ Eternal glory to Yu-Fang.
 #include <iostream>
 #include <cmath>
 
+#include <mata/nft/nft.hh>
+#include <mata/nft/builder.hh>
+#include <mata/nft/strings.hh>
+
 #include "ast/ast_pp.h"
 #include "smt/smt_context.h"
 #include "smt/smt_model_generator.h"
@@ -19,6 +23,9 @@ Eternal glory to Yu-Fang.
 
 #include "decision_procedure.h"
 #include "theory_str_noodler.h"
+
+extern char const * g_input_file;
+size_t file_counter{ 0 };
 
 namespace smt::noodler {
 
@@ -65,7 +72,6 @@ namespace smt::noodler {
             return v;
         }
     }
-
 
     bool theory_str_noodler::internalize_atom(app *const atom, const bool gate_ctx) {
         (void) gate_ctx;
@@ -138,7 +144,7 @@ namespace smt::noodler {
             expr *ex = ctx.get_asserted_formula(i);
             ctx.mark_as_relevant(ex);
             string_theory_propagation(ex, true, false);
-            
+
         }
         add_conversion_num_axioms();
         add_len_num_axioms();
@@ -172,7 +178,7 @@ namespace smt::noodler {
         // Check if we already axiomatized the expr
         if (propagated_string_theory.contains(expr)) {
             return;
-        }     
+        }
         propagated_string_theory.insert(expr);
 
         sort *expr_sort = expr->get_sort();
@@ -285,14 +291,14 @@ namespace smt::noodler {
             return;
         } else if(!m.is_ite(a_str)) {
             // build axiom 1: Length(a_str) >= 0
-            { 
+            {
                 /**
-                 * FIXME: fix some day. Based on some expriments it is better to introduce this axiom when returning 
-                 * length formula from the decision procedure. If the axiom was introduced here, it leads to solving 
-                 * more equations (not exactly sure why, maybe due to the cooperation with LIA solver, maybe it is not 
+                 * FIXME: fix some day. Based on some expriments it is better to introduce this axiom when returning
+                 * length formula from the decision procedure. If the axiom was introduced here, it leads to solving
+                 * more equations (not exactly sure why, maybe due to the cooperation with LIA solver, maybe it is not
                  * properly relevancy propagated...)
                  */
-                //return; 
+                //return;
                 STRACE("str-axiom", tout << "[Non-Zero Axiom] " << mk_pp(a_str, m) << std::endl);
 
                 // build LHS
@@ -310,13 +316,13 @@ namespace smt::noodler {
                 STRACE("str", tout << "string axiom 1: " << mk_ismt2_pp(lhs_ge_rhs, m) << std::endl;);
 
                 add_axiom({mk_literal(lhs_ge_rhs)});
-                
- 
-                this->axiomatized_len_axioms.push_back(lhs_ge_rhs);
-                    
 
-                
-                
+
+                this->axiomatized_len_axioms.push_back(lhs_ge_rhs);
+
+
+
+
                 //return;
             }
 
@@ -396,13 +402,25 @@ namespace smt::noodler {
         } else if (m_util_s.str.is_index(n)) { // str.indexof
             handle_index_of(n);
         } else if (m_util_s.str.is_replace(n)) { // str.replace
+            // TODO(nft): Create NFTs.
+//            util::throw_error("str.replace is not supported");
+            replace_terms.insert(n);
             handle_replace(n);
         } else if(m_util_s.str.is_replace_all(n)) { // str.replace_all
-            util::throw_error("str.replace_all is not supported");
+            // TODO(nft): Create NFTs.
+//            std::cout << mk_pp(n, m) << "\n";
+            replace_terms.insert(n);
+            handle_replace_all(n);
+            //util::throw_error("str.replace_all is not supported");
         } else if(m_util_s.str.is_replace_re(n)) { // str.replace_re
+            // TODO(nft): Create NFTs.
+//            util::throw_error("str.replace_re is not supported");
             handle_replace_re(n);
         } else if(m_util_s.str.is_replace_re_all(n)) { // str.replace_re_all
-            util::throw_error("str.replace_re_all is not supported");
+            // TODO(nft): Create NFTs.
+            replace_terms.insert(n);
+            handle_replace_re_all(n);
+//            util::throw_error("str.replace_re_all is not supported");
         } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
             handle_is_digit(n);
         } else if (
@@ -644,7 +662,7 @@ namespace smt::noodler {
                      << " with assignment " << ctx.find_assignment(eq.get())
                      << " and its reverse is " << (ctx.is_relevant(eq_rev.get()) ? "" : "not ") << "relevant" << std::endl;
             );
-            
+
             // check if equation or its reverse are relevant (we check reverse to be safe) and...
             if((ctx.is_relevant(eq.get()) || ctx.is_relevant(eq_rev.get())) &&
                // ...neither equation nor its reverse are saved as relevant yet
@@ -664,7 +682,7 @@ namespace smt::noodler {
                      << " with assignment " << ctx.find_assignment(dis.get())
                      << " and its reverse is " << (ctx.is_relevant(dis_rev.get()) ? "" : "not ") << "relevant" << std::endl;
             );
-            
+
             // check if disequation or its reverse are relevant (we check reverse to be safe) and...
             if((ctx.is_relevant(dis.get()) || ctx.is_relevant(dis_rev.get())) &&
                // ...neither disequation nor its reverse are saved as relevant yet
@@ -682,7 +700,7 @@ namespace smt::noodler {
                 memb_app = m.mk_not(memb_app);
 
             }
-            
+
             STRACE("str",
                 tout << "  " << mk_pp(memb_app.get(), m) << " is " << (ctx.is_relevant(memb_app.get()) ? "" : "not ") << "relevant"
                      << " with assignment " << ctx.find_assignment(memb_app.get())
@@ -711,7 +729,7 @@ namespace smt::noodler {
                      << std::endl;
             );
 
-            if((ctx.is_relevant(con_expr.get()) || ctx.is_relevant(not_con_expr.get())) && 
+            if((ctx.is_relevant(con_expr.get()) || ctx.is_relevant(not_con_expr.get())) &&
                 !this->m_not_contains_todo_rel.contains(not_con_pair)) {
                 this->m_not_contains_todo_rel.push_back(not_con_pair);
             }
@@ -728,13 +746,13 @@ namespace smt::noodler {
 
     /**
      * @brief Checks satisfiability of constraints in _todo member variables (e.g. m_word_eq_todo, m_membership_todo,...)
-     * 
+     *
      * It follows these steps:
      *   1) Remove constraints that are not relevant for the solution, adding all relevant constraints to *_todo_rel, ending with
      *        - language equations and diseqations (m_lang_eq_or_diseq_todo_rel)
      *        - word equations and diseqations (m_word_eq_todo_rel and m_word_diseq_todo_rel)
      *        - membership constraints (m_membership_todo_rel)
-     *        - not contains constraints (m_not_contains_todo, currently cannot be handled and we return unknown) 
+     *        - not contains constraints (m_not_contains_todo, currently cannot be handled and we return unknown)
      *   2) Check if all language eqations and disequations are true (the sides are given as regexes)
      *   3) Create the formula instance and automata assignment from word (dis)eqautions and membership constraints
      *   4) Check if it is satisfiable which consists of
@@ -744,6 +762,7 @@ namespace smt::noodler {
      */
     final_check_status theory_str_noodler::final_check_eh() {
         TRACE("str", tout << "final_check starts" << std::endl;);
+//        assert(!replace_terms.empty());
 
         remove_irrelevant_constr();
 
@@ -788,7 +807,7 @@ namespace smt::noodler {
         /***************************** SOLVE WORD (DIS)EQUATIONS + REGULAR MEMBERSHIPS ******************************/
 
         // cache for storing already solved instances. For each instance we store the length formula obtained from the decision procedure.
-        // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure 
+        // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure
         // we get the same formula up to alpha reduction).
         if(m_params.m_loop_protect) {
             lbool result = run_loop_protection();
@@ -814,6 +833,7 @@ namespace smt::noodler {
         // Gather relevant word (dis)equations to noodler formula
         Formula instance = get_word_formula_from_relevant();
         STRACE("str",
+            tout << "instance predicates:\n";
             for(const auto& f : instance.get_predicates()) {
                 tout << f.to_string() << std::endl;
             }
@@ -821,12 +841,203 @@ namespace smt::noodler {
 
         // Gather symbols from relevant (dis)equations and from regular expressions of relevant memberships
         std::set<mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
-        // For the case that it is possible we have to_int/from_int, we keep digits (0-9) as explicit symbols, so that they are not represented by dummy_symbol and it is easier to handle to_int/from_int
+        // For the case that it is possible we have to_int/from_int, we keep digits (0-9) as explicit symbols, so that they are not represented by dummy_symbol, and it is easier to handle to_int/from_int
         if (!m_conversion_todo.empty()) {
             for (mata::Symbol s = 48; s <= 57; ++s) {
                 symbols_in_formula.insert(s);
             }
         }
+        // Show symbols in formula.
+        STRACE("str",
+            tout << "symbols in> formula:\n";
+            std::ranges::for_each(symbols_in_formula, [&](mata::Symbol symbol){
+                STRACE("str", tout << symbol << " ");
+            });
+            tout << "\n";
+       );
+
+        // Output replace[_re][_all] NFTs.
+        mata::EnumAlphabet mata_alphabet(symbols_in_formula.begin(), symbols_in_formula.end());
+        const std::vector<mata::Symbol> mata_alphabet_vec{ mata_alphabet.get_alphabet_symbols().ToVector() };
+        STRACE("str",
+            tout << "Replace terms:\n";
+            for (const auto replace: replace_terms) {
+                tout << mk_pp(replace, m) << "\n";
+            }
+        );
+
+        for (const auto replace: replace_terms) {
+            std::vector<mata::nft::Nft> replace_nfts{};
+            mata::nft::Nft replace_nft;
+            mata::nft::Nft input;
+
+            const symbol& replace_term_name{ to_app(replace)->get_name() };
+            if (replace_term_name == "str.replace") {
+                auto literal{ to_app(to_app(replace)->get_arg(1))->get_parameter(0).get_zstring() };
+                mata::Word regex{};
+                for (size_t i{ 0 }; i < literal.length(); ++i) {
+                    regex.push_back(literal[i]);
+                }
+
+                literal = to_app(to_app(replace)->get_arg(2))->get_parameter(0).get_zstring();
+                mata::Word replacement{};
+                for (size_t i{ 0 }; i < literal.length(); ++i) {
+                    replacement.push_back(literal[i]);
+                }
+
+                if (literal.length() == 1) {
+                    mata::nft::strings::replace_reluctant_single_symbol(
+                        literal[0],
+                        replacement,
+                        &mata_alphabet,
+                        mata::nft::strings::ReplaceMode::Single
+                    )
+                }
+                replace_nft = mata::nft::strings::replace_reluctant_literal(
+                        regex,
+                        replacement,
+                        &mata_alphabet,
+                        mata::nft::strings::ReplaceMode::Single
+                );
+
+                input = mata::nft::Nft{{}, {}, {}, {}, 2 };
+                mata::nft::State target{ input.add_state(0) };
+                input.initial.insert(target);
+                input.insert_identity(0, mata_alphabet_vec);
+                target = input.insert_word_by_parts(target, { regex, regex });
+                input.insert_identity(target, mata_alphabet_vec);
+                target = input.insert_word_by_parts(target, { regex, regex });
+                input.insert_identity(target, mata_alphabet_vec);
+                input.final.insert(target);
+            } else if (replace_term_name == "str.replace_all") {
+                auto literal{ to_app(to_app(replace)->get_arg(1))->get_parameter(0).get_zstring() };
+                mata::Word regex{};
+                for (size_t i{ 0 }; i < literal.length(); ++i) {
+                    regex.push_back(literal[i]);
+                }
+
+                literal = to_app(to_app(replace)->get_arg(2))->get_parameter(0).get_zstring();
+                mata::Word replacement{};
+                for (size_t i{ 0 }; i < literal.length(); ++i) {
+                    replacement.push_back(literal[i]);
+                }
+                replace_nft = mata::nft::strings::replace_reluctant_literal(
+                        regex,
+                        replacement,
+                        &mata_alphabet,
+                        mata::nft::strings::ReplaceMode::All
+                );
+
+                input = mata::nft::Nft{{}, {}, {}, {}, 2 };
+                mata::nft::State target{ input.add_state(0) };
+                input.initial.insert(target);
+                input.insert_identity(0, mata_alphabet_vec);
+                target = input.insert_word_by_parts(target, { regex, regex });
+                input.insert_identity(target, mata_alphabet_vec);
+                target = input.insert_word_by_parts(target, { regex, regex });
+                input.insert_identity(target, mata_alphabet_vec);
+                input.final.insert(target);
+            } else if (replace_term_name == "str.replace_re") {
+//                auto literal{ to_app(to_app(replace)->get_arg(1))->get_parameter(0).get_zstring() };
+                mata::nfa::Nfa regex{
+                        regex::conv_to_nfa(to_app(to_app(replace)->get_arg(1)), m_util_s, m,
+                                           std::set<mata::Symbol>{ mata_alphabet_vec.begin(),
+                                                                   mata_alphabet_vec.end() })
+                };
+
+                auto literal = to_app(to_app(replace)->get_arg(2))->get_parameter(0).get_zstring();
+                mata::Word replacement{};
+                for (size_t i{ 0 }; i < literal.length(); ++i) {
+                    replacement.push_back(literal[i]);
+                }
+                replace_nft = mata::nft::strings::replace_reluctant_regex(
+                        regex,
+                        replacement,
+                        &mata_alphabet,
+                        mata::nft::strings::ReplaceMode::Single
+                );
+
+                mata::nft::Nft regex_nft{ mata::nft::builder::create_from_nfa(regex, 2) };
+
+//                STRACE("str", tout << "regex nft:\n" << regex_nft.print_to_DOT());
+
+                input = mata::nft::Nft{{}, {}, {}, {}, 2 };
+                mata::nft::State target{ input.add_state(0) };
+                input.initial.insert(target);
+                input.insert_identity(0, mata_alphabet_vec);
+                input.final.insert(target);
+                mata::nft::Nft identity_nft{ mata::nft::builder::create_sigma_star_nft(&mata_alphabet, 2) };
+//                STRACE("str", tout << "sigma star nft:\n" << identity_nft.print_to_DOT());
+                input
+                        .concatenate(regex_nft)
+                        .concatenate(identity_nft)
+                        .concatenate(regex_nft)
+                        .concatenate(identity_nft);
+            } else if (replace_term_name == "str.replace_re_all") {
+//                auto literal{ to_app(to_app(replace)->get_arg(1))->get_parameter(0).get_zstring() };
+                mata::nfa::Nfa regex{
+                    regex::conv_to_nfa(to_app(to_app(replace)->get_arg(1)), m_util_s, m,
+                    std::set<mata::Symbol>{ mata_alphabet_vec.begin(),
+                                            mata_alphabet_vec.end() })
+                };
+
+                auto literal = to_app(to_app(replace)->get_arg(2))->get_parameter(0).get_zstring();
+                mata::Word replacement{};
+                for (size_t i{ 0 }; i < literal.length(); ++i) {
+                    replacement.push_back(literal[i]);
+                }
+                replace_nft = mata::nft::strings::replace_reluctant_regex(
+                        regex,
+                        replacement,
+                        &mata_alphabet,
+                        mata::nft::strings::ReplaceMode::All
+                );
+
+                mata::nft::Nft regex_nft{ mata::nft::builder::create_from_nfa(regex, 2) };
+
+//                STRACE("str", tout << "regex nft:\n" << regex_nft.print_to_DOT());
+
+                input = mata::nft::Nft{{}, {}, {}, {}, 2};
+                mata::nft::State target{ input.add_state(0) };
+                input.initial.insert(target);
+                input.insert_identity(0, mata_alphabet_vec);
+                input.final.insert(target);
+                mata::nft::Nft identity_nft{ mata::nft::builder::create_sigma_star_nft(&mata_alphabet, 2) };
+//                STRACE("str", tout << "sigma star nft:\n" << identity_nft.print_to_DOT());
+                input
+                    .concatenate(regex_nft)
+                    .concatenate(identity_nft)
+                    .concatenate(regex_nft)
+                    .concatenate(identity_nft);
+            }
+            std::string input_file_name { g_input_file };
+            std::string word_benchmarks{ "benchmarks" };
+            auto pos = input_file_name.find(word_benchmarks);
+            input_file_name = input_file_name.erase(0, pos + word_benchmarks.size() + 1);
+            std::ranges::replace(input_file_name, '/', '-');
+            std::ranges::replace(input_file_name, '.', '-');
+
+            STRACE("str",
+                   tout
+                       << "input file: " << input_file_name << "_" << file_counter << "\n"
+                       << "input:\n"
+                       << input.print_to_DOT() << "\n"
+                       << "replace all NFT:\n"
+                       << mk_pp(replace, m) << "\n"
+                       << replace_nft.print_to_DOT() << "\n"
+            );
+
+            std::filesystem::create_directories("../../../generated_benchmarks/projection");
+            std::string output_file_path{ "../../../generated_benchmarks/projection/" + input_file_name + "_" + std::to_string(file_counter) + ".mata" };
+            std::ofstream output_file{output_file_path};
+            ++file_counter;
+            output_file << replace_nft.print_to_mata() << "\n";
+            output_file.close();
+        }
+
+        exit(1);
+
+
 
         // Create automata assignment for the formula
         AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
@@ -896,7 +1107,7 @@ namespace smt::noodler {
                 auto [noodler_lengths, precision] = dec_proc.get_lengths();
                 lengths = len_node_to_z3_formula(noodler_lengths);
                 lbool is_lengths_sat = check_len_sat(lengths);
-                
+
                 if (is_lengths_sat == l_true && precision != LenNodePrecision::OVERAPPROX) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     // save the current assignment to catch it during the loop protection
@@ -968,7 +1179,7 @@ namespace smt::noodler {
         ast_manager &m = get_manager();
         context &ctx = get_context();
         expr_ref ex{e, m};
-        // simplify the expression. This was commented before and it caused 
+        // simplify the expression. This was commented before and it caused
         // problems at some point, I am not pretty sure of what kind.
         m_rewrite(ex);
 
@@ -1068,7 +1279,7 @@ namespace smt::noodler {
         expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m);
 
         rational r;
-        
+
         zstring str;
         // handle the case str.at "A" i
         if(m_util_s.str.is_string(s, str) && str.length() == 1) {
@@ -1125,7 +1336,7 @@ namespace smt::noodler {
         string_theory_propagation(xey);
 
         expr_ref len_x(m_util_s.str.mk_length(x), m);
- 
+
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(s, xey, false)});
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(one, m_util_s.str.mk_length(fresh), false)});
         add_axiom({~i_ge_0, i_ge_len_s, mk_literal(re)});
@@ -1160,7 +1371,7 @@ namespace smt::noodler {
         literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
         literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
-        
+
         expr* num_val, *ind_val;
         rational num_val_rat;
         if(r.is_zero() && expr_cases::is_indexof_add(l, s, m, m_util_s, m_util_a, num_val, ind_val) && m_util_a.is_numeral(num_val, num_val_rat) && num_val_rat.is_one()) {
@@ -1209,7 +1420,7 @@ namespace smt::noodler {
                     substr_re = m_util_s.re.mk_full_char(nullptr);
                 } else {
                     substr_re = m_util_s.re.mk_concat(substr_re, m_util_s.re.mk_full_char(nullptr));
-                }  
+                }
             }
             expr_ref substr_in(m_util_s.re.mk_in_re(v, substr_re), m);
 
@@ -1236,7 +1447,7 @@ namespace smt::noodler {
             this->predicate_replace.insert(e, v.get());
             // update length variables
             util::get_str_variables(s, this->m_util_s, m, this->len_vars);
-            // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
+            // add length |v| = l. This is not true entirely, because there could be a case that v = eps.
             // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
             // after that)
             this->var_eqs.add(expr_ref(l, m), v);
@@ -1298,7 +1509,7 @@ namespace smt::noodler {
         this->predicate_replace.insert(e, v.get());
         // update length variables
         util::get_str_variables(s, this->m_util_s, m, this->len_vars);
-        // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
+        // add length |v| = l. This is not true entirely, because there could be a case that v = eps.
         // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
         // after that)
         this->var_eqs.add(expr_ref(l, m), v);
@@ -1412,12 +1623,12 @@ namespace smt::noodler {
                 expr_ref fv = mk_str_var_fresh("in_substr");
                 x = m_util_s.str.mk_concat(x, fv);
                 vars.push_back(fv);
-            }    
+            }
         }
         expr_ref xe(m_util_s.str.mk_concat(x, v), m);
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
 
-       
+
         expr_ref ls(m_util_s.str.mk_length(s), m);
         expr_ref lx(m_util_s.str.mk_length(x), m);
         expr_ref le(m_util_s.str.mk_length(v), m);
@@ -1471,7 +1682,7 @@ namespace smt::noodler {
         } else {
             this->var_eqs.add(expr_ref(i, m), x);
             this->len_vars.insert(x);
-        }        
+        }
     }
 
     /**
@@ -1543,9 +1754,9 @@ namespace smt::noodler {
             // add_axiom({~mk_eq(s, a, false), mk_eq(v, t,false)});
             // s != eps && s != a -> v = a
             add_axiom({mk_eq(s, a, false), s_emp, mk_eq(v, a,false)});
-            
 
-            // The following axioms are redundant in the sense of completeness, but in the nested replace calls 
+
+            // The following axioms are redundant in the sense of completeness, but in the nested replace calls
             // they can relate the contains predicate from the general replace (and thence the SAT solver can help a lot).
             literal cnt = mk_literal(m_util_s.str.mk_contains(s, a));
             add_axiom({~cnt, mk_eq(v, t,false)});
@@ -1580,7 +1791,127 @@ namespace smt::noodler {
         if(m_util_s.str.is_string(s, str_a) && m_util_s.str.is_string(t, str_b) && str_a.length() >= str_b.length()) {
             add_axiom({~cnt, mk_literal(m.mk_eq(m_util_s.str.mk_length(v), m_util_a.mk_sub(m_util_s.str.mk_length(a), m_util_a.mk_int(str_a.length() - str_b.length()) )))});
         }
-        
+
+        // s = eps -> v = t.a
+        add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
+        // contains(a,s) && a != eps && s != eps -> a = x.s.y
+        add_axiom({~cnt, a_emp, s_emp, mk_eq(a, xsy,false)});
+        // contains(a,s) && a != eps && s != eps -> v = x.t.y
+        add_axiom({~cnt, a_emp, s_emp, mk_eq(v, xty,false)});
+        ctx.force_phase(cnt);
+        // tighttestprefix(s, x, not(contains(a,s) && a != eps && s != eps))
+        tightest_prefix(s, x, {~cnt, a_emp, s_emp});
+
+        predicate_replace.insert(r, v.get());
+    }
+
+    /**
+     * @brief Handling of str.replace(a,s,t) = v ... a where to replace, s what to find, t replacement.
+     * Translates to the following theory axioms:
+     * replace(a,s,t) = v
+     * a = eps && s != eps -> v = a
+     * (not(contains(a,s))) -> v = a
+     * s = eps -> v = t.a
+     * contains(a,s) && a != eps && s != eps -> a = x.s.y
+     * contains(a,s) && a != eps && s != eps -> v = x.t.y
+     * tighttestprefix(s, x, not(contains(a,s) && a != eps && s != eps))
+     *
+     * @param r replace term
+     */
+    void theory_str_noodler::handle_replace_all(expr *r) {
+        STRACE("str", tout << "handle-replace-all: " << mk_pp(r, m) << '\n';);
+
+        if(axiomatized_persist_terms.contains(r))
+            return;
+
+        axiomatized_persist_terms.insert(r);
+        context& ctx = get_context();
+        expr* a = nullptr, *s = nullptr, *t = nullptr;
+        VERIFY(m_util_s.str.is_replace_all(r, a, s, t));
+
+        expr_ref v = mk_str_var_fresh("replace");
+        expr_ref x = mk_str_var_fresh("replace_left");
+        expr_ref y = mk_str_var_fresh("replace_right");
+        expr_ref xty = mk_concat(x, mk_concat(t, y));
+        expr_ref xsy = mk_concat(x, mk_concat(s, y));
+        expr_ref eps(m_util_s.str.mk_string(""), m);
+        literal a_emp = mk_eq_empty(a);
+        literal s_emp = mk_eq_empty(s);
+
+        // if s = t -> the result is unchanged
+        add_axiom({~mk_eq(s, t, false), mk_eq(v, a,false)});
+        // s = eps -> |v| = |a| + |t|
+        add_axiom({~s_emp, mk_literal(m.mk_eq(m_util_s.str.mk_length(v), m_util_a.mk_add(m_util_s.str.mk_length(a), m_util_s.str.mk_length(t))))});
+
+        expr* indexof = nullptr;
+        if(expr_cases::is_replace_indexof(a, s, m, m_util_s, m_util_a, indexof)) {
+            expr_ref minus_one(m_util_a.mk_int(-1), m);
+            expr_ref v = mk_str_var_fresh("replace");
+            expr_ref eps(m_util_s.str.mk_string(""), m);
+            literal ind_eq_m1 = mk_eq(indexof, minus_one, false);
+            expr_ref len_a_m1(m_util_a.mk_sub(m_util_s.str.mk_length(a), m_util_a.mk_int(1)), m);
+            expr_ref substr(m_util_s.str.mk_substr(a, m_util_a.mk_int(0), len_a_m1), m);
+
+
+            // s = eps -> v = t.a
+            add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
+            add_axiom({ind_eq_m1, mk_eq(v, mk_concat(substr, t),false)});
+            add_axiom({~ind_eq_m1, mk_eq(v, eps, false)});
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        }
+
+        zstring str_a, str_b;
+        // str.replace "A" s t where a = "A"
+        if(m_util_s.str.is_string(a, str_a) && str_a.length() == 1) {
+            // s = emp -> v = t.a
+            // NOTE: if we use ~s_emp, this diseqation does not become relevant
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v, mk_concat(t, a),false)});
+            // s = a -> v = t
+            // NOTE: if we use ~mk_eq(s, a), this diseqation does not become relevant
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, a))), mk_eq(v, t,false)});
+            // add_axiom({~mk_eq(s, a, false), mk_eq(v, t,false)});
+            // s != eps && s != a -> v = a
+            add_axiom({mk_eq(s, a, false), s_emp, mk_eq(v, a,false)});
+
+
+            // The following axioms are redundant in the sense of completeness, but in the nested replace calls
+            // they can relate the contains predicate from the general replace (and thence the SAT solver can help a lot).
+            literal cnt = mk_literal(m_util_s.str.mk_contains(s, a));
+            add_axiom({~cnt, mk_eq(v, t,false)});
+            add_axiom({cnt, s_emp, mk_eq(v, a,false)});
+            ctx.force_phase(cnt);
+
+            // replace(a,s,t) = v
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+            // str.replace "" s t where a = ""
+        } else if(m_util_s.str.is_string(a, str_a) && str_a.length() == 0) {
+            // s = emp -> v = t.a
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v,t,false)});
+            // s = emp -> v = t.a
+            add_axiom({s_emp, mk_eq_empty(v)});
+            // replace(a,s,t) = v
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        }
+
+        literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
+        // replace(a,s,t) = v
+        add_axiom({mk_eq(v, r, false)});
+        // a = eps && s != eps -> v = a
+        add_axiom({~a_emp, s_emp, mk_eq(v, a, false)});
+        // (not(contains(a,s))) -> v = a
+        add_axiom({cnt, mk_eq(v, a, false)});
+
+        // if both strings are explicit and cnt holds, extract exact lengths of the result.
+        if(m_util_s.str.is_string(s, str_a) && m_util_s.str.is_string(t, str_b) && str_a.length() >= str_b.length()) {
+            add_axiom({~cnt, mk_literal(m.mk_eq(m_util_s.str.mk_length(v), m_util_a.mk_sub(m_util_s.str.mk_length(a), m_util_a.mk_int(str_a.length() - str_b.length()) )))});
+        }
+
         // s = eps -> v = t.a
         add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
         // contains(a,s) && a != eps && s != eps -> a = x.s.y
@@ -1626,7 +1957,44 @@ namespace smt::noodler {
         add_axiom({mk_literal(m_util_s.re.mk_in_re(s, SRS)), mk_eq(v, s, false)});
         // (s = x.y.z && x \not\in \Sigma*R\Sigma* && y \in R) -> v = x.t.z
         add_axiom({mk_literal(m.mk_not(m.mk_eq(s, xyz))), mk_literal(m_util_s.re.mk_in_re(x, SRS)), mk_literal(m_util_s.re.mk_in_re(x, SRS)), mk_eq(v, xtz, false)});
-        
+
+        add_axiom({mk_eq(v, e, false)});
+        predicate_replace.insert(e, v.get());
+    }
+
+    /**
+     * @brief Handling of str.replace(s,R,t) = v ... s where to replace, R regex what to find, t replacement.
+     * Translates to the following theory axioms:
+     * replace(s,R,t) = v
+     * s \not\in \Sigma*R\Sigma* -> v = s
+     * (s = x.y.z && x \not\in \Sigma*R\Sigma* && y \in R) -> v = x.t.z
+     *
+     * @param e replace_re term
+     */
+    void theory_str_noodler::handle_replace_re_all(expr *e) {
+        STRACE("str", tout << "handle-replace-re-all: " << mk_pp(e, m) << '\n';);
+
+        if(axiomatized_persist_terms.contains(e))
+            return;
+        axiomatized_persist_terms.insert(e);
+
+        context& ctx = get_context();
+        expr *s = nullptr, *R = nullptr, *t = nullptr;
+        VERIFY(m_util_s.str.is_replace_re_all(e, s, R, t));
+        expr_ref v = mk_str_var_fresh("replace_re");
+        expr_ref x = mk_str_var_fresh("replace_re_left");
+        expr_ref y = mk_str_var_fresh("replace_re_middle");
+        expr_ref z = mk_str_var_fresh("replace_re_right");
+        expr_ref xyz = mk_concat(x, mk_concat(y, z));
+        expr_ref xtz = mk_concat(x, mk_concat(t, z));
+        expr_ref sigma_star(m_util_s.re.mk_full_seq(R->get_sort()), m);
+        expr_ref SRS(m_util_s.re.mk_concat(sigma_star, m_util_s.re.mk_concat(R, sigma_star)), m);
+
+        // s \not\in \Sigma*R\Sigma* -> v = s
+        add_axiom({mk_literal(m_util_s.re.mk_in_re(s, SRS)), mk_eq(v, s, false)});
+        // (s = x.y.z && x \not\in \Sigma*R\Sigma* && y \in R) -> v = x.t.z
+        add_axiom({mk_literal(m.mk_not(m.mk_eq(s, xyz))), mk_literal(m_util_s.re.mk_in_re(x, SRS)), mk_literal(m_util_s.re.mk_in_re(x, SRS)), mk_eq(v, xtz, false)});
+
         add_axiom({mk_eq(v, e, false)});
         predicate_replace.insert(e, v.get());
     }
@@ -2124,7 +2492,7 @@ namespace smt::noodler {
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
                 m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)),
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
-          
+
             add_axiom({mk_literal(e), ~mk_literal(re)});
             add_axiom({mk_literal(cont), mk_literal(re)});
         } else if(m_util_s.str.is_string(x, s) && s.length() == 1) { // special case for not(contains "A" t)
@@ -2135,7 +2503,7 @@ namespace smt::noodler {
 
     /**
      * @brief Handler for assigning boolean value to the not(contains) predicate.
-     * 
+     *
      * @param e Not contains predicate
      */
     void theory_str_noodler::assign_not_contains(expr *e) {
@@ -2154,7 +2522,7 @@ namespace smt::noodler {
     /**
      * @brief Handle str.<=
      * Translates to the following axiom
-     * 
+     *
      * x <= y -> x = y | x < y
      * not(x <= y) -> y > x
      * @param e str.<= predicate
@@ -2168,7 +2536,7 @@ namespace smt::noodler {
 
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_le(e, x, y));
-      
+
         expr_ref e_lt(m_util_s.str.mk_lex_lt(x, y), m);
         expr_ref x_y(m.mk_eq(x,y), m);
         literal lit_e_lt = mk_literal(e_lt);
@@ -2184,7 +2552,7 @@ namespace smt::noodler {
     /**
      * @brief Handle str.<
      * Translates to the following theory axioms.
-     * 
+     *
      * not(x < y) -> x = y | y < x
      * x < y & x = eps -> y != eps
      * x < y & x != eps -> x = u.v1.w1
@@ -2222,19 +2590,19 @@ namespace smt::noodler {
         literal lit_e = mk_literal(e);
         literal lit_x_px = mk_literal(x_px);
         literal lit_y_py = mk_literal(y_py);
-        
+
         expr_ref re_in_left(m_util_s.re.mk_in_re(lex_in_left, m_util_s.re.mk_full_char(nullptr)), m);
         expr_ref re_in_right(m_util_s.re.mk_in_re(lex_in_right, m_util_s.re.mk_full_char(nullptr)), m);
         expr_ref to_code_left(m_util_s.str.mk_to_code(lex_in_left), m);
         expr_ref to_code_right(m_util_s.str.mk_to_code(lex_in_right), m);
-  
-        // This is a dirty hack. If I add axiom to_code(v1) < to_code(v2), the LIA solver starts 
+
+        // This is a dirty hack. If I add axiom to_code(v1) < to_code(v2), the LIA solver starts
         // to solve a nonlinear problem (?). If I use to_code(v1) + k = to_code(v2) where k > 0, it works well.
         expr_ref vark = mk_int_var_fresh("lex_add");
         expr_ref to_code_lt(m.mk_eq(m_util_a.mk_add(to_code_left, vark), to_code_right), m);
         // k >= 1
         add_axiom({mk_literal(m_util_a.mk_ge(vark, m_util_a.mk_int(1)))});
-        
+
         literal lit_x_eps = mk_literal(x_eps);
         literal lit_y_eps = mk_literal(y_eps);
         literal lit_e_switch = mk_literal(m_util_s.str.mk_lex_lt(y,x));
@@ -2274,22 +2642,22 @@ namespace smt::noodler {
                 var = mk_str_var_fresh("revar");
                 this->predicate_replace.insert(re_constr.get(), var.get());
             }
-            
+
             // app_ref fv(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(), 0, nullptr, this->m_util_s.mk_string_sort()), m);
             expr_ref eq_fv(mk_eq_atom(var.get(), s), m);
             expr_ref n_re(this->m_util_s.re.mk_in_re(var, re), m);
             expr_ref re_orig(e, m);
 
             // propagate_basic_string_axioms(ctx.get_enode(eq_fv));
-            
+
             if(!is_true) {
                 n_re = m.mk_not(n_re);
                 re_orig = m.mk_not(re_orig);
             }
             add_axiom({mk_literal(eq_fv)});
             add_axiom({~mk_literal(re_orig), mk_literal(n_re)});
-            
-            re_constr = to_app(var); 
+
+            re_constr = to_app(var);
             re_atom = n_re;
         }
 
@@ -2299,12 +2667,12 @@ namespace smt::noodler {
 
     /**
      * @brief Handle is_digit
-     * 
+     *
      * Translates into equivalence:
      * is_digit(s) <-> s \in [0-9]
-     * 
+     *
      * @param e str.is_digit(s)
-     * 
+     *
      * TODO: This probably makes is_digit always relevant.
      */
     void theory_str_noodler::handle_is_digit(expr *e) {
@@ -2347,9 +2715,9 @@ namespace smt::noodler {
      */
     void theory_str_noodler::add_len_num_axioms() {
         // number bound for the conversion of length constraints into regex constraints.
-        // For higher values this conversion could not be beneficial as we would work with 
+        // For higher values this conversion could not be beneficial as we would work with
         // big automata in the decision procedure.
-        const int MAX_NUM = 64; 
+        const int MAX_NUM = 64;
         unsigned nFormulas = ctx.get_num_asserted_formulas();
         for (unsigned i = 0; i < nFormulas; ++i) {
             expr *ex = ctx.get_asserted_formula(i);
@@ -2362,7 +2730,7 @@ namespace smt::noodler {
                         re = m_util_s.re.mk_full_char(nullptr);
                     } else {
                         re = m_util_s.re.mk_concat(re, m_util_s.re.mk_full_char(nullptr));
-                    }  
+                    }
                 }
                 expr_ref in_re(m_util_s.re.mk_in_re(len_arg, re), m);
                 add_axiom({~mk_literal(ex), mk_literal(in_re)});
@@ -2377,7 +2745,7 @@ namespace smt::noodler {
 
     /**
      * @brief Handle to_code, from_code, to_int, from_int
-     * 
+     *
      * Collects (and possibly creates) variables for the argument and result
      * of the term and puts them in m_conversion_todo.
      */

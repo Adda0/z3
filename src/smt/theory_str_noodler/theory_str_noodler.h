@@ -50,7 +50,7 @@ namespace smt::noodler {
          * Structure for storing items for the loop protection.
          */
         struct stored_instance {
-            expr_ref lengths; // length formula 
+            expr_ref lengths; // length formula
             bool initial_length; // was the length formula obtained from the initial length checking?
         };
 
@@ -81,6 +81,7 @@ namespace smt::noodler {
         obj_hashtable<expr> m_has_length;          // is length applied
         expr_ref_vector     m_length;             // length applications themselves
         std::vector<std::pair<expr_ref, stored_instance>> axiomatized_instances;
+        obj_hashtable<expr> replace_terms;
 
         // TODO what are these?
         vector<std::pair<obj_hashtable<expr>,std::vector<app_ref>>> len_state;
@@ -188,7 +189,7 @@ namespace smt::noodler {
 
         /**
          * @brief Transforms LenNode to the z3 formula
-         * 
+         *
          * Uses mapping var_name, those variables v that are mapped are assumed to be string variables
          * and will be transformed into (str.len v) while other variables (which are probably created
          * during preprocessing/decision procedure) are taken as int variables.
@@ -197,15 +198,15 @@ namespace smt::noodler {
 
         /**
          * @brief Adds @p e as a theory axiom (i.e. to SAT solver).
-         * 
+         *
          * @param e Axiom to add, probably should be a predicate.
-         * 
+         *
          * TODO Nobody probably knows what happens in here.
          */
         void add_axiom(expr *e);
         /**
          * @brief Adds a new clause of literals from @p ls.
-         * 
+         *
          * TODO Nobody probably knows what happens in here, and it is a bit different than the other add_axiom
          */
         void add_axiom(std::vector<literal> ls);
@@ -217,6 +218,8 @@ namespace smt::noodler {
         void handle_index_of(expr *e);
         void handle_replace(expr *e);
         void handle_replace_re(expr *e);
+        void handle_replace_all(expr *e);
+        void handle_replace_re_all(expr *e);
         void handle_prefix(expr *e);
         void handle_suffix(expr *e);
         void handle_not_prefix(expr *e);
@@ -236,12 +239,12 @@ namespace smt::noodler {
 
         expr_ref construct_refinement();
         /**
-         * @brief Introduce string axioms for a formula @p ex. 
-         * 
+         * @brief Introduce string axioms for a formula @p ex.
+         *
          * @param ex Formula whose terms should be inspected.
          * @param init Is it an initial string formula (formula from input)?
          * @param neg Is the formula under negation?
-         * @param var_lengths Introduce lengths axioms for variables of the form x = eps -> |x| = 0? 
+         * @param var_lengths Introduce lengths axioms for variables of the form x = eps -> |x| = 0?
          */
         void string_theory_propagation(expr * ex, bool init = false, bool neg = false, bool var_lengths = false);
         void propagate_concat_axiom(enode * cat);
@@ -251,17 +254,17 @@ namespace smt::noodler {
          * Creates theory axioms that hold iff either any of the negated assumption from @p neg_assumptions holds,
          * or string term @p s does not occur in @p x@p s other than at the end. I.e. we are checking
          * (not-negated assumptions) -> (string term @p s does not occur in @p x@p s other than at the end)
-         * 
+         *
          * It does it by checking that s does not occur anywhere in xs reduced by one character (i.e. xs[0:-2])
-         * 
+         *
          * Translates to the following theory axioms:
          * not(s = eps) -> neg_assumptions || s = s1.s2
          * not(s = eps) -> neg_assumptions || s2 in re.allchar (is a single character)
          * not(s = eps) -> neg_assumptions || not(contains(x.s1, s))
          * (s = eps) && (x != eps) -> neg_assumptions
-         * 
+         *
          * For the case that s is a string literal, we do not add the two first axioms and we take s1 = s[0:-2].
-         * 
+         *
          * @param neg_assumptions Negated assumptions that have to hold for checking tightest prefix
          */
         void tightest_prefix(expr* s, expr* x, std::vector<literal> neg_assumptions);
@@ -311,7 +314,7 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> get_init_length_vars(AutAssignment& ass);
         /**
          * @brief Get the conversions (to/from_int/code) with noodler variables
-         * 
+         *
          * Side effect: string variables in conversions which are not mapped in the automata
          * assignment @p ass will be mapped to sigma* after this.
          */
@@ -332,26 +335,26 @@ namespace smt::noodler {
 
         /**
          * @brief Check if the length formula @p len_formula is satisfiable with the existing length constraints.
-         * 
-         * @param[out] unsat_core If this parameter is NOT nullptr, the LIA solver stores here unsat core of 
+         *
+         * @param[out] unsat_core If this parameter is NOT nullptr, the LIA solver stores here unsat core of
          * the current @p len_formula. If the parameter is nullptr, the unsat core is not computed.
          */
         lbool check_len_sat(expr_ref len_formula, expr_ref* unsat_core=nullptr);
 
         /**
          * @brief Blocks current SAT assignment for given @p len_formula
-         * 
+         *
          * @param len_formula Length formula corresponding to the current instance
          * @param add_axiomatized Add item to the vector of axiomatized instances (for the loop protection)
          * @param init_lengths Was the length formula obtained from the initial length checking (for the fool protection)
-         * 
+         *
          * TODO explain better
          */
         void block_curr_len(expr_ref len_formula, bool add_axiomatized = true, bool init_lengths = false);
 
         /**
          * @brief Checks if the current instance is suitable for Nielsen decision procedure.
-         * 
+         *
          * @param instance Current instance converted to Formula
          * @param init_length_sensitive_vars Length variables
          * @return true <-> suitable for Nielsen-based decision procedure
@@ -360,7 +363,7 @@ namespace smt::noodler {
 
         /**
          * @brief Check if the current instance is suitable for underapproximation.
-         * 
+         *
          * @param instance Current instance converted to Formula
          * @param aut_ass Current automata assignment
          * @param convs String-Int conversions
@@ -370,7 +373,7 @@ namespace smt::noodler {
 
         /**
          * @brief Wrapper for running the Nielsen transformation.
-         * 
+         *
          * @param instance Formula instance
          * @param aut_assignment Current automata assignment
          * @param init_length_sensitive_vars Length sensitive variables
@@ -380,21 +383,21 @@ namespace smt::noodler {
 
         /**
          * @brief Wrapper for running the membership query heuristics.
-         * 
+         *
          * @return lbool Outcome of the heuristic procedure.
          */
         lbool run_membership_heur();
 
         /**
          * @brief Wrapper for running the loop protection.
-         * 
+         *
          * @return lbool Outcome of the loop protection
          */
         lbool run_loop_protection();
 
         /**
          * @brief Run length-based satisfiability checking.
-         * 
+         *
          * @param instance Current instance converted to Formula
          * @param aut_ass Current automata assignment
          * @param init_length_sensitive_vars Length sensitive variables

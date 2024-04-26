@@ -82,7 +82,7 @@ TEST_CASE( "Remove regular", "[noodler]" ) {
     conj.add_predicate(eq4);
     conj.add_predicate(ieq1);
     FormulaPreprocessor prep(conj, aut_ass, {}, {});
-    prep.remove_regular();
+    prep.remove_regular({});
 
     AutAssignment ret = prep.get_aut_assignment();
     CHECK(prep.get_dependency() == Dependency({{2, {3}}}));
@@ -97,7 +97,7 @@ TEST_CASE( "Remove regular", "[noodler]" ) {
         conj.add_predicate(eq1);
         conj.add_predicate(eq2);
         FormulaPreprocessor prep(conj, aut_ass, {x2}, {});
-        prep.remove_regular();
+        prep.remove_regular({});
         CHECK(prep.get_dependency() == Dependency({}));
         CHECK(prep.get_flat_dependency() == Dependency({}));
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({

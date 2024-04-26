@@ -667,11 +667,11 @@ br_status seq_rewriter::mk_app_core(func_decl * f, unsigned num_args, expr * con
         break;
     case OP_SEQ_REPLACE:
         SASSERT(num_args == 3);
-        st = mk_seq_replace(args[0], args[1], args[2], result);
+//        st = mk_seq_replace(args[0], args[1], args[2], result);
         break;
     case OP_SEQ_REPLACE_ALL:
         SASSERT(num_args == 3);
-        st = mk_seq_replace_all(args[0], args[1], args[2], result);
+//        st = mk_seq_replace_all(args[0], args[1], args[2], result);
         break;
     case OP_SEQ_MAP:
         SASSERT(num_args == 2);
@@ -691,11 +691,11 @@ br_status seq_rewriter::mk_app_core(func_decl * f, unsigned num_args, expr * con
         break;
     case OP_SEQ_REPLACE_RE:
         SASSERT(num_args == 3);
-        st = mk_seq_replace_re(args[0], args[1], args[2], result);
+//        st = mk_seq_replace_re(args[0], args[1], args[2], result);
         break;
     case OP_SEQ_REPLACE_RE_ALL:
         SASSERT(num_args == 3);
-        st = mk_seq_replace_re_all(args[0], args[1], args[2], result);
+//        st = mk_seq_replace_re_all(args[0], args[1], args[2], result);
         break;
     case OP_SEQ_TO_RE:
         SASSERT(num_args == 1);

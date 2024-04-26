@@ -100,3 +100,5 @@ CMakeSettings.json
 .DS_Store
 dbg/**
 *.wsp
+CMakeFiles
+.idea

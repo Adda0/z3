@@ -123,6 +123,70 @@ namespace smt::noodler {
                 }
                 return result;
             }
+
+            case PredicateType::Replace: {
+                std::string result{ "Replace " };
+                for (const auto& item: params[0]) {
+                    result += " " + item.to_string();
+                }
+                result += " ,";
+                for (const auto& item: params[1]) {
+                    result += " " + item.to_string();
+                }
+                result += " ,";
+                for (const auto& item: params[2]) {
+                    result += " " + item.to_string();
+                }
+                return result;
+            }
+
+            case PredicateType::ReplaceAll: {
+                std::string result{ "ReplaceAll " };
+                for (const auto& item: params[0]) {
+                    result += " " + item.to_string();
+                }
+                result += " ,";
+                for (const auto& item: params[1]) {
+                    result += " " + item.to_string();
+                }
+                result += " ,";
+                for (const auto& item: params[2]) {
+                    result += " " + item.to_string();
+                }
+                return result;
+            }
+
+            case PredicateType::ReplaceRe: {
+                std::string result{ "ReplaceRe " };
+                for (const auto& item: params[0]) {
+                    result += " " + item.to_string();
+                }
+                result += " ,";
+                for (const auto& item: params[1]) {
+                    result += " " + item.to_string();
+                }
+                result += " ,";
+                for (const auto& item: params[2]) {
+                    result += " " + item.to_string();
+                }
+                return result;
+            }
+
+            case PredicateType::ReplaceReAll: {
+                std::string result{ "ReplaceReAll " };
+                for (const auto& item: params[0]) {
+                    result += " " + item.to_string();
+                }
+                result += " ,";
+                for (const auto& item: params[1]) {
+                    result += " " + item.to_string();
+                }
+                result += " ,";
+                for (const auto& item: params[2]) {
+                    result += " " + item.to_string();
+                }
+                return result;
+            }
         }
 
         throw std::runtime_error("Unhandled predicate type passed as 'this' to to_string().");

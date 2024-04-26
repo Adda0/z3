@@ -46,7 +46,7 @@ Revision History:
 
 typedef enum { IN_UNSPECIFIED, IN_SMTLIB_2, IN_DATALOG, IN_DIMACS, IN_WCNF, IN_OPB, IN_LP, IN_Z3_LOG, IN_DRAT } input_kind;
 
-static char const * g_input_file          = nullptr;
+char const * g_input_file          = nullptr;
 static char const * g_drat_input_file     = nullptr;
 static bool         g_standard_input      = false;
 static input_kind   g_input_kind          = IN_UNSPECIFIED;
@@ -426,4 +426,3 @@ int STD_CALL main(int argc, char ** argv) {
             return ERR_INTERNAL_FATAL;
     }
 }
-

@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-cd build/ && cmake ../ && make -j 4 test-noodler && ./test-noodler
+./compile_z3_noodler.sh debug test && ./build/build-debug/test-noodler
