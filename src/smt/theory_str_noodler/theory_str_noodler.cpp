@@ -35,6 +35,106 @@ namespace {
         mata::nft::Nft input_language{};
     };
 
+    std::string get_input_file_name() {
+        std::string input_file_name { g_input_file };
+//        std::cout << g_input_file << "\n";
+
+        std::string word_benchmarks{ "benchmarks" };
+        auto pos = input_file_name.find(word_benchmarks);
+//        std::cout << pos << "\n";
+        input_file_name = input_file_name.erase(0, pos + word_benchmarks.size() + 1);
+        std::ranges::replace(input_file_name, '/', '-');
+        std::ranges::replace(input_file_name, '.', '-');
+        return input_file_name;
+    }
+
+    void print_composition(std::vector<ReplaceNft>& replace_nft_struct) {
+        static size_t file_counter = 0;
+            std::filesystem::create_directories("../../../generated_benchmarks/composition");
+            std::filesystem::create_directories("../../../generated_benchmarks/composition/pair");
+            std::string output_file_path{
+                    "../../../generated_benchmarks/composition/pair/" +
+                    get_input_file_name() +
+                    "_" + std::to_string(file_counter) +
+                    //                    (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
+                    ".mata"
+            };
+//            std::cout << input_file_name << "\n";
+//            std::cout << output_file_path << "\n";
+            std::ofstream output_file{output_file_path};
+//            if (!replace_nft_struct.is_replace_single_symbol) {
+            ++file_counter;
+//            }
+            for (const ReplaceNft& replace_nft_struct_elem: replace_nft_struct) {
+                mata::nft::Nft replace_nft = replace_nft_struct_elem.replace_nft;
+                output_file << replace_nft.print_to_DOT();
+            }
+            output_file.close();
+    }
+
+    void print_apply_literal(ReplaceNft& replace_nft) {
+        static size_t file_counter = 0;
+            std::filesystem::create_directories("../../../generated_benchmarks/apply_literal");
+            std::string output_file_path{
+                    "../../../generated_benchmarks/apply_literal/" +
+                    get_input_file_name() +
+                    "_" + std::to_string(file_counter) +
+                    //                    (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
+                    ".mata"
+            };
+//            std::cout << input_file_name << "\n";
+//            std::cout << output_file_path << "\n";
+            std::ofstream output_file{output_file_path};
+//            if (!replace_nft_struct.is_replace_single_symbol) {
+            ++file_counter;
+//            }
+            output_file << replace_nft.input_literal.print_to_DOT();
+            output_file << replace_nft.replace_nft.print_to_DOT();
+            output_file.close();
+    }
+
+    void print_apply_language(ReplaceNft& replace_nft) {
+        static size_t file_counter = 0;
+
+        std::filesystem::create_directories("../../../generated_benchmarks/apply_language");
+        std::string output_file_path{
+                "../../../generated_benchmarks/apply_language/" +
+                get_input_file_name() +
+                "_" + std::to_string(file_counter) +
+                //                    (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
+                ".mata"
+        };
+//            std::cout << input_file_name << "\n";
+//            std::cout << output_file_path << "\n";
+        std::ofstream output_file{output_file_path};
+        output_file << replace_nft.input_language.print_to_DOT();
+//            if (!replace_nft_struct.is_replace_single_symbol) {
+        ++file_counter;
+//            }
+        output_file << replace_nft.replace_nft.print_to_DOT();
+        output_file.close();
+    }
+
+    void print_projection(ReplaceNft& replace_nft) {
+        static size_t file_counter = 0;
+            std::filesystem::create_directories("../../../generated_benchmarks/projection");
+            std::string output_file_path{
+                    "../../../generated_benchmarks/projection/" +
+                    get_input_file_name() +
+                    "_" + std::to_string(file_counter) +
+                    //                (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
+                    ".mata"
+            };
+//            std::cout << input_file_name << "\n";
+//            std::cout << output_file_path << "\n";
+            std::ofstream output_file{output_file_path};
+//            if (!replace_nft_struct.is_replace_single_symbol) {
+            ++file_counter;
+//            }
+            output_file << replace_nft.replace_nft.print_to_DOT();
+            output_file.close();
+    }
+
     mata::nft::Nft create_input(const std::vector<mata::Symbol>& mata_alphabet_vec, const mata::Word& regex) {
         mata::nft::Nft input = mata::nft::Nft{{}, {}, {}, {}, 2 };
         mata::nft::State target{ input.add_state(0) };
@@ -288,21 +388,17 @@ namespace {
         return replace_nft_struct;
     }
 
-    void create_nfts(expr* replace, mata::Alphabet& mata_alphabet, ast_manager& m, seq_util& m_util_s,
-                     std::vector<ReplaceNft>& replace_nfts_apply_literal,
-                     std::vector<ReplaceNft>& replace_nfts_apply_language,
-                     std::vector<ReplaceNft>& replace_nfts_projection,
-                     std::vector<std::vector<ReplaceNft>>& replace_nfts_composition,
-                     std::vector<std::vector<ReplaceNft>>& replace_nfts_composition_pairs) {
+    void create_nfts(expr* replace, mata::Alphabet& mata_alphabet, ast_manager& m, seq_util& m_util_s
+                     ) {
         auto cmp = [](expr* x, expr* y) { return &(*x) < &(*y); };
         static std::set<expr*, bool (*)(expr*, expr*)> handled(cmp);
         if (handled.contains(replace)) { return; }
         handled.insert(replace);
         
         ReplaceNft replace_nft{ create_nft(replace, mata_alphabet, m, m_util_s) };
-        replace_nfts_projection.push_back(replace_nft);
-        replace_nfts_apply_language.push_back(replace_nft);
-        replace_nfts_apply_literal.push_back(replace_nft);
+        print_projection(replace_nft);
+        print_apply_language(replace_nft);
+        print_apply_literal(replace_nft);
 
         // Create composition.
         std::vector<ReplaceNft> replace_nfts{ replace_nft };
@@ -323,17 +419,19 @@ namespace {
             if (replace_nfts.size() == 1) { // Only the currently solved 'replace' instance is on the stack.
                 composition_sequence.push_back(last_nft);
                 composition_sequence.push_back(replace_nft);
-                replace_nfts_composition_pairs.push_back({ last_nft, replace_nft });
+                std::vector<ReplaceNft> vec{ last_nft, replace_nft };
+                print_composition(vec);
                 if (current_composition.num_of_states() != 0) {
-                    replace_nfts_composition_pairs.push_back({
-                         ReplaceNft{
-                                 .replace_nft = current_composition,
-                                 .is_replace_single_symbol = last_nft.is_replace_single_symbol,
-                                 .input_literal = last_nft.input_literal,
-                                 .input_language = last_nft.input_language,
-                         },
-                         last_nft
-                     });
+                    vec = {
+                            ReplaceNft{
+                                    .replace_nft = current_composition,
+                                    .is_replace_single_symbol = last_nft.is_replace_single_symbol,
+                                    .input_literal = last_nft.input_literal,
+                                    .input_language = last_nft.input_language,
+                            },
+                            last_nft
+                    };
+                    print_composition(vec);
                     current_composition = mata::nft::compose(current_composition, last_nft.replace_nft);
                 } else {
                     current_composition = last_nft.replace_nft;
@@ -344,26 +442,32 @@ namespace {
                         .input_literal = last_nft.input_literal,
                         .input_language = last_nft.input_language,
                 };
-                replace_nfts_composition_pairs.push_back({
-                    current_composition_replace_nft,
-                    replace_nft
-                });
-                replace_nfts_projection.push_back(current_composition_replace_nft);
-                replace_nfts_apply_literal.push_back(current_composition_replace_nft);
-                replace_nfts_apply_language.push_back(current_composition_replace_nft);
+                vec = {
+                        current_composition_replace_nft,
+                        replace_nft
+                };
+                print_composition(vec);
+                print_projection(current_composition_replace_nft);
+                print_apply_literal(current_composition_replace_nft);
+                print_apply_language(current_composition_replace_nft);
             } else {
                 composition_sequence.push_back(last_nft);
-                replace_nfts_composition_pairs.push_back({ last_nft, replace_nft });
+                std::vector<ReplaceNft> vec = {
+                        last_nft,
+                        replace_nft
+                };
+                print_composition(vec);
                 if (current_composition.num_of_states() != 0) {
-                    replace_nfts_composition_pairs.push_back({
-                         ReplaceNft{
-                             .replace_nft = current_composition,
-                             .is_replace_single_symbol = last_nft.is_replace_single_symbol,
-                             .input_literal = last_nft.input_literal,
-                             .input_language = last_nft.input_language,
-                         },
-                         last_nft
-                     });
+                    std::vector<ReplaceNft> vec = {
+                            ReplaceNft{
+                                    .replace_nft = current_composition,
+                                    .is_replace_single_symbol = last_nft.is_replace_single_symbol,
+                                    .input_literal = last_nft.input_literal,
+                                    .input_language = last_nft.input_language,
+                            },
+                            last_nft
+                    };
+                    print_composition(vec);
                     current_composition = mata::nft::compose(current_composition, last_nft.replace_nft);
                 } else {
                     current_composition = last_nft.replace_nft;
@@ -374,12 +478,12 @@ namespace {
                         .input_literal = last_nft.input_literal,
                         .input_language = last_nft.input_language,
                 };
-                replace_nfts_projection.push_back(current_composition_replace_nft);
-                replace_nfts_apply_literal.push_back(current_composition_replace_nft);
-                replace_nfts_apply_language.push_back(current_composition_replace_nft);
+                print_projection(current_composition_replace_nft);
+                print_apply_literal(current_composition_replace_nft);
+                print_apply_language(current_composition_replace_nft);
             }
         }
-//        replace_nfts_composition.push_back(std::move(composition_sequence));
+        print_composition(composition_sequence);
 
 //        STRACE("str",
 //               tout
@@ -1234,149 +1338,8 @@ namespace smt::noodler {
             }
         );
 
-        std::string input_file_name { g_input_file };
-//        std::cout << g_input_file << "\n";
-
-        std::set<const expr*> handled_nfts{};
-
-        std::vector<ReplaceNft> replace_nfts_projection{};
-        std::vector<ReplaceNft> replace_nfts_apply_literal{};
-        std::vector<ReplaceNft> replace_nfts_apply_language{};
-        std::vector<std::vector<ReplaceNft>> replace_nfts_composition{};
-        std::vector<std::vector<ReplaceNft>> replace_nfts_composition_pairs{};
         for (const auto replace: replace_terms) {
-            create_nfts(
-                replace, mata_alphabet, m, m_util_s,
-                replace_nfts_apply_literal,
-                replace_nfts_apply_language,
-                replace_nfts_projection,
-                replace_nfts_composition,
-                replace_nfts_composition_pairs
-            );
-        }
-
-        std::string word_benchmarks{ "benchmarks" };
-        auto pos = input_file_name.find(word_benchmarks);
-//        std::cout << pos << "\n";
-        input_file_name = input_file_name.erase(0, pos + word_benchmarks.size() + 1);
-        std::ranges::replace(input_file_name, '/', '-');
-        std::ranges::replace(input_file_name, '.', '-');
-
-        file_counter = 0;
-        for (auto& replace_nft_struct: replace_nfts_projection) {
-            mata::nft::Nft replace_nft = std::move(replace_nft_struct.replace_nft);
-
-            std::filesystem::create_directories("../../../generated_benchmarks/projection");
-            std::string output_file_path{
-                "../../../generated_benchmarks/projection/" +
-                input_file_name +
-                "_" + std::to_string(file_counter) +
-//                (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
-                ".mata"
-            };
-//            std::cout << input_file_name << "\n";
-//            std::cout << output_file_path << "\n";
-            std::ofstream output_file{output_file_path};
-//            if (!replace_nft_struct.is_replace_single_symbol) {
-                ++file_counter;
-//            }
-            output_file << replace_nft.print_to_DOT();
-            output_file.close();
-        }
-
-        file_counter = 0;
-        for (auto& replace_nft_struct: replace_nfts_apply_language) {
-            mata::nft::Nft replace_nft = std::move(replace_nft_struct.replace_nft);
-
-            std::filesystem::create_directories("../../../generated_benchmarks/apply_language");
-            std::string output_file_path{
-                    "../../../generated_benchmarks/apply_language/" +
-                    input_file_name +
-                    "_" + std::to_string(file_counter) +
-//                    (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
-                    ".mata"
-            };
-//            std::cout << input_file_name << "\n";
-//            std::cout << output_file_path << "\n";
-            std::ofstream output_file{output_file_path};
-            output_file << replace_nft_struct.input_language.print_to_DOT();
-//            if (!replace_nft_struct.is_replace_single_symbol) {
-                ++file_counter;
-//            }
-            output_file << replace_nft.print_to_DOT();
-            output_file.close();
-        }
-
-        file_counter = 0;
-        for (auto& replace_nft_struct: replace_nfts_apply_literal) {
-            mata::nft::Nft replace_nft = std::move(replace_nft_struct.replace_nft);
-
-            std::filesystem::create_directories("../../../generated_benchmarks/apply_literal");
-            std::string output_file_path{
-                    "../../../generated_benchmarks/apply_literal/" +
-                    input_file_name +
-                    "_" + std::to_string(file_counter) +
-                    //                    (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
-                    ".mata"
-            };
-//            std::cout << input_file_name << "\n";
-//            std::cout << output_file_path << "\n";
-            std::ofstream output_file{output_file_path};
-//            if (!replace_nft_struct.is_replace_single_symbol) {
-                ++file_counter;
-//            }
-            output_file << replace_nft_struct.input_literal.print_to_DOT();
-            output_file << replace_nft.print_to_DOT();
-            output_file.close();
-        }
-
-        file_counter = 0;
-        for (auto& replace_nft_struct: replace_nfts_composition_pairs) {
-            std::filesystem::create_directories("../../../generated_benchmarks/composition");
-            std::filesystem::create_directories("../../../generated_benchmarks/composition/pair");
-            std::string output_file_path{
-                    "../../../generated_benchmarks/composition/pair" +
-                    input_file_name +
-                    "_" + std::to_string(file_counter) +
-                    //                    (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
-                    ".mata"
-            };
-//            std::cout << input_file_name << "\n";
-//            std::cout << output_file_path << "\n";
-            std::ofstream output_file{output_file_path};
-//            if (!replace_nft_struct.is_replace_single_symbol) {
-            ++file_counter;
-//            }
-            for (ReplaceNft replace_nft_struct_elem: replace_nft_struct) {
-                mata::nft::Nft replace_nft = std::move(replace_nft_struct_elem.replace_nft);
-                output_file << replace_nft.print_to_DOT();
-            }
-            output_file.close();
-
-        }
-
-        file_counter = 0;
-        for (auto& replace_nft_struct: replace_nfts_composition) {
-            std::filesystem::create_directories("../../../generated_benchmarks/composition");
-            std::filesystem::create_directories("../../../generated_benchmarks/composition/sequence");
-            std::string output_file_path{
-                    "../../../generated_benchmarks/composition/sequence" +
-                    input_file_name +
-                    "_" + std::to_string(file_counter) +
-                    //                    (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
-                    ".mata"
-            };
-//            std::cout << input_file_name << "\n";
-//            std::cout << output_file_path << "\n";
-            std::ofstream output_file{output_file_path};
-//            if (!replace_nft_struct.is_replace_single_symbol) {
-            ++file_counter;
-//            }
-            for (ReplaceNft replace_nft_struct_elem: replace_nft_struct) {
-                mata::nft::Nft replace_nft = std::move(replace_nft_struct_elem.replace_nft);
-                output_file << replace_nft.print_to_DOT();
-            }
-            output_file.close();
+            create_nfts(replace, mata_alphabet, m, m_util_s);
         }
 
         exit(42);
