@@ -48,12 +48,12 @@ namespace {
         return input_file_name;
     }
 
-    void print_composition(std::vector<ReplaceNft>& replace_nft_struct) {
+    void print_composition(std::vector<ReplaceNft>& replace_nft_struct, std::string_view composition_type) {
         static size_t file_counter = 0;
             std::filesystem::create_directories("../../../generated_benchmarks/composition");
-            std::filesystem::create_directories("../../../generated_benchmarks/composition/pair");
+            std::filesystem::create_directories(std::format("../../../generated_benchmarks/composition/{}/", composition_type));
             std::string output_file_path{
-                    "../../../generated_benchmarks/composition/pair/" +
+                    std::format("../../../generated_benchmarks/composition/{}/", composition_type) +
                     get_input_file_name() +
                     "_" + std::to_string(file_counter) +
                     //                    (replace_nft_struct.is_replace_single_symbol ? "_single-symbol" : "") +
@@ -390,8 +390,9 @@ namespace {
 
     void create_nfts(expr* replace, mata::Alphabet& mata_alphabet, ast_manager& m, seq_util& m_util_s
                      ) {
-        auto cmp = [](expr* x, expr* y) { return &(*x) < &(*y); };
-        static std::set<expr*, bool (*)(expr*, expr*)> handled(cmp);
+//        auto cmp = [](expr* x, expr* y) { return &(*x) < &(*y); };
+//        static std::set<expr*, bool (*)(expr*, expr*)> handled(cmp);
+        static std::set<expr*> handled{};
         if (handled.contains(replace)) { return; }
         handled.insert(replace);
         
@@ -408,6 +409,7 @@ namespace {
         std::string current_expr_name{ to_app(current_expr)->get_name().str() };
 //        std::cout << "one replace " << current_expr_name << "\n";
         while (current_expr_name.find("str.replace") != std::string::npos) {
+            handled.insert(current_expr);
             replace_nfts.push_back(create_nft(current_expr, mata_alphabet, m, m_util_s));
             current_expr = to_app(current_expr)->get_arg(0);
             current_expr_name = to_app(current_expr)->get_name().str();
@@ -420,7 +422,7 @@ namespace {
                 composition_sequence.push_back(last_nft);
                 composition_sequence.push_back(replace_nft);
                 std::vector<ReplaceNft> vec{ last_nft, replace_nft };
-                print_composition(vec);
+                print_composition(vec, "pair");
                 if (current_composition.num_of_states() != 0) {
                     vec = {
                             ReplaceNft{
@@ -431,7 +433,7 @@ namespace {
                             },
                             last_nft
                     };
-                    print_composition(vec);
+                    print_composition(vec, "pair");
                     current_composition = mata::nft::compose(current_composition, last_nft.replace_nft);
                 } else {
                     current_composition = last_nft.replace_nft;
@@ -446,7 +448,7 @@ namespace {
                         current_composition_replace_nft,
                         replace_nft
                 };
-                print_composition(vec);
+                print_composition(vec, "pair");
                 print_projection(current_composition_replace_nft);
                 print_apply_literal(current_composition_replace_nft);
                 print_apply_language(current_composition_replace_nft);
@@ -456,7 +458,7 @@ namespace {
                         last_nft,
                         replace_nft
                 };
-                print_composition(vec);
+                print_composition(vec, "pair");
                 if (current_composition.num_of_states() != 0) {
                     std::vector<ReplaceNft> vec = {
                             ReplaceNft{
@@ -467,7 +469,7 @@ namespace {
                             },
                             last_nft
                     };
-                    print_composition(vec);
+                    print_composition(vec, "pair");
                     current_composition = mata::nft::compose(current_composition, last_nft.replace_nft);
                 } else {
                     current_composition = last_nft.replace_nft;
@@ -483,7 +485,7 @@ namespace {
                 print_apply_language(current_composition_replace_nft);
             }
         }
-        print_composition(composition_sequence);
+        print_composition(composition_sequence, "sequence");
 
 //        STRACE("str",
 //               tout
@@ -877,12 +879,12 @@ namespace smt::noodler {
         } else if (m_util_s.str.is_replace(n)) { // str.replace
             // TODO(nft): Create NFTs.
 //            util::throw_error("str.replace is not supported");
-            replace_terms.insert(n);
+            replace_terms.push_back(n);
             handle_replace(n);
         } else if(m_util_s.str.is_replace_all(n)) { // str.replace_all
             // TODO(nft): Create NFTs.
 //            std::cout << mk_pp(n, m) << "\n";
-            replace_terms.insert(n);
+            replace_terms.push_back(n);
             handle_replace_all(n);
             //util::throw_error("str.replace_all is not supported");
         } else if(m_util_s.str.is_replace_re(n)) { // str.replace_re
@@ -891,7 +893,7 @@ namespace smt::noodler {
             handle_replace_re(n);
         } else if(m_util_s.str.is_replace_re_all(n)) { // str.replace_re_all
             // TODO(nft): Create NFTs.
-            replace_terms.insert(n);
+            replace_terms.push_back(n);
             handle_replace_re_all(n);
 //            util::throw_error("str.replace_re_all is not supported");
         } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
@@ -1338,9 +1340,18 @@ namespace smt::noodler {
             }
         );
 
+//        auto cmp = [](expr* x, expr* y) { return x->hash() < y->hash(); };
+//        static std::set<expr*, bool (*)(expr*, expr*)> handled(cmp);
+        std::cout << "replace_terms: " << replace_terms.size() << "\n";
+//        size_t handled_num{};
+        std::ranges::reverse(replace_terms);
         for (const auto replace: replace_terms) {
+//            if (handled.contains(replace)) { continue; }
+//            handled.insert(replace);
+//            ++handled_num;
             create_nfts(replace, mata_alphabet, m, m_util_s);
         }
+//        std::cout << handled_num << "\n";
 
         exit(42);
 

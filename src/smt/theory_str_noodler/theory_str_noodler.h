@@ -81,7 +81,7 @@ namespace smt::noodler {
         obj_hashtable<expr> m_has_length;          // is length applied
         expr_ref_vector     m_length;             // length applications themselves
         std::vector<std::pair<expr_ref, stored_instance>> axiomatized_instances;
-        obj_hashtable<expr> replace_terms;
+        std::vector<expr*> replace_terms;
 
         // TODO what are these?
         vector<std::pair<obj_hashtable<expr>,std::vector<app_ref>>> len_state;
