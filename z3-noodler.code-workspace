@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"name": "mata",
+			"path": "../Mata/mata"
+		},
+		{
+			"name": "z3-noodler",
+			"path": "."
+		},
+		{
+			"name": "generated_benchmarks",
+			"path": "../generated_benchmarks"
+		},
+		{
+			"name": "benchmarks",
+			"path": "../benchmarks"
+		}
+	],
+	"settings": {}
+}
